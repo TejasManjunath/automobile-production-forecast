@@ -214,7 +214,7 @@ Ask me clarifying questions before writing code if anything about the
 harness or data handling is ambiguous - I'd rather lose two minutes now
 than produce results my teammate can't compare to theirs.
 ```
-Repo structure — set this up tonight before anyone commits a model:
+## 8. Repo structure 
 ```
 auto-forecasting-project/
 ├── README.md                          ← the brief + objective
@@ -229,5 +229,9 @@ auto-forecasting-project/
 │   └── comparison_sheet.csv           ← both of you append rows here, harness enforces the schema
 └── slides/                           
 ```
-Links :
-Google Sheets : https://docs.google.com/spreadsheets/d/1ZEj9fiKvT7f7GpcaDJrukRmAjcT3F2u4j8v44R8iA-k/edit?usp=sharing
+## 9. Links 
+1. Google Sheets : https://docs.google.com/spreadsheets/d/1ZEj9fiKvT7f7GpcaDJrukRmAjcT3F2u4j8v44R8iA-k/edit?usp=sharing
+2. The dataset itself — german_auto_monthly_2016_2026.csv (already built, attached above). This is the one your team actually models on. Don't make teammates re-derive it from raw sources.
+3. VDA monthly figures (source of the dataset, for citation/methodology slide): https://www.vda.de/en/news/facts-and-figures/monthly-figures
+4. VDA 2026 forecast (institutional benchmark numbers): https://www.vda.de/en/press/press-releases/2025/251208_PM_Forecasts_2026
+5. Bundesbank Monthly Report Nov 2024 (chart source, automotive sector discussion, cite for context not as a numeric benchmark): https://publikationen.bundesbank.de/publikationen-en/reports-studies/monthly-reports/monthly-report-november-2024-943818
