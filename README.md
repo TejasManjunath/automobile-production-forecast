@@ -214,3 +214,16 @@ Ask me clarifying questions before writing code if anything about the
 harness or data handling is ambiguous - I'd rather lose two minutes now
 than produce results my teammate can't compare to theirs.
 ```
+Repo structure — set this up tonight before anyone commits a model:
+auto-forecasting-project/
+├── README.md                          ← the brief + objective 
+├── data/
+│   └── german_auto_monthly_2016_2026.csv
+├── harness/
+│   └── backtest_harness.py            ← built FIRST, shared, nobody touches after
+├── models/
+│   ├── modeler1_baselines_smoothing.py
+│   └── modeler2_arima_sarima_combo.py
+├── results/
+│   └── comparison_sheet.csv           ← both of you append rows here, harness enforces the schema
+└── slides/                            ← teammate 3's folder, keep out of your way
