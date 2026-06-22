@@ -1,0 +1,2 @@
+model_name,owner,backtest_origin_date,horizon,ME,MAE,RMSE,theils_u,white_noise_pvalue,normality_pvalue,in_sample_or_oos
+"SARIMA(0,1,1)(0,1,1)[12]+exog",modeler2,ALL_OOS,1,-849272808484500.8,849272808512954.1,7403788695344313.0,162713907217.91693,0.9999999989171424,2.0237250278778096e-19,oos
