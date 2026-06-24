@@ -1,0 +1,2 @@
+Model,Selected_variables,N_predictors,AIC,BIC,R_squared,Adj_R_squared,Model_F_pvalue
+"Backward Stepwise (AIC, p<=0.10)","M03, M05, M06, M07, M10, M11, M12, post_covid, lag1",9,2637.19,2664.37,0.6086,0.5741,0
