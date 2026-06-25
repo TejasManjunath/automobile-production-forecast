@@ -39,7 +39,7 @@ def load_data(filepath):
 
     print(f"✓ Data loaded: {ts.index[0].strftime('%b %Y')} → {ts.index[-1].strftime('%b %Y')} ({len(ts)} months)")
     return ts
-ts = load_data("/Users/zeynepbetulbozdogan/Downloads/DatenInternetarchivAusgabedatei.xlsx")
+ts = load_data("data/Daten+Internetarchiv+Ausgabedatei_e.xlsx")
 def get_post2020_series(ts):
     """Return the post-2020 pc_new_registrations series."""
     return ts.loc['2020-01-01':, 'pc_new_registrations'].copy()
@@ -55,9 +55,29 @@ plt.show()
 # acf─────────────────────────────────────────────────────────────────────────────
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
+# Original series
 fig, axes = plt.subplots(2, 1, figsize=(12, 8))
+
 plot_acf(series, lags=24, ax=axes[0])
-plot_pacf(series, lags=24, ax=axes[1])
+axes[0].set_title("Original Series ACF")
+
+plot_pacf(series, lags=24, ax=axes[1], method="ywm")
+axes[1].set_title("Original Series PACF")
+
+plt.tight_layout()
+plt.show()
+
+# First-differenced series
+series_diff = series.diff().dropna()
+
+fig, axes = plt.subplots(2, 1, figsize=(12, 8))
+
+plot_acf(series_diff, lags=24, ax=axes[0])
+axes[0].set_title("Differenced Series ACF")
+
+plot_pacf(series_diff, lags=24, ax=axes[1], method="ywm")
+axes[1].set_title("Differenced Series PACF")
+
 plt.tight_layout()
 plt.show()
 #adf

@@ -1,0 +1,5 @@
+Transformation,ADF_stat,p_value,Result
+Level,-1.544,0.5115,non-stationary
+d=1,-4.419,0.0003,stationary
+D=12,-2.616,0.0897,non-stationary
+"d=1, D=12",-5.389,0.0,stationary

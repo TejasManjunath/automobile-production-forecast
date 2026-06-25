@@ -169,28 +169,117 @@ def record(name, fitted, fcast):
 # ═══════════════════════════════════════════════════════════════════════════
 #  STEP 1 — EXPLORATORY ANALYSIS
 # ═══════════════════════════════════════════════════════════════════════════
+
 step(1, "EXPLORATORY ANALYSIS — see the data and its seasonal structure")
+
 dec = seasonal_decompose(r, model="additive", period=12)
+
 print(f"  Strong seasonality: Mar & Jun peak, Jan trough.")
 print(f"  Structural level shift after COVID (Apr 2020): pre ~3.5M/yr → post ~2.8M/yr.")
 
 fig, ax = plt.subplots(2, 2, figsize=(14, 7))
-fig.suptitle("Step 1 — Exploratory analysis: German car registrations",
-             fontsize=12, fontweight="bold")
-ax[0,0].plot(r.index, r.values, color=COL["Actual"], lw=1.3)
-for yr in VDA: ax[0,0].scatter([pd.Timestamp(yr,6,1)],[VDA[yr]["forecast"]/12],
-              color=COL["VDA"], s=55, marker="D", zorder=5)
-ax[0,0].set_title("Monthly registrations + VDA annual targets (♦)"); ax[0,0].yaxis.set_major_formatter(KFMT)
-ax[0,1].plot(dec.trend.dropna(), color=COL["MA(12)"], lw=1.8); ax[0,1].set_title("Trend component"); ax[0,1].yaxis.set_major_formatter(KFMT)
-mavg=[dec.seasonal[dec.seasonal.index.month==m].mean() for m in range(1,13)]
-ax[1,0].bar(["J","F","M","A","M","J","J","A","S","O","N","D"], mavg,
-            color=["#D4537E" if v>0 else "#378ADD" for v in mavg], alpha=.8)
-ax[1,0].set_title("Seasonal component (avg by month)"); ax[1,0].yaxis.set_major_formatter(KFMT)
-diffid=r.diff().diff(12).dropna(); ci=2/np.sqrt(len(diffid)); av=acf(diffid,nlags=24,fft=True)
-ax[1,1].bar(range(1,25), av[1:25], color=["#7F77DD" if abs(v)>ci else "#D3D1C7" for v in av[1:25]])
-ax[1,1].axhline(ci,color=COL["VDA"],ls="--",lw=.8); ax[1,1].axhline(-ci,color=COL["VDA"],ls="--",lw=.8)
-ax[1,1].set_title("ACF after d=1, D=12 (significant = coloured)"); ax[1,1].set_xlabel("Lag")
-plt.tight_layout(); plt.savefig("results/plots/step1_exploratory.png", bbox_inches="tight"); plt.show(); plt.close()
+
+fig.suptitle(
+    "Step 1 — Exploratory analysis: German car registrations",
+    fontsize=12,
+    fontweight="bold"
+)
+
+# ------------------------------------------------------------------
+# Top-left: Monthly registrations + VDA annual targets
+# ------------------------------------------------------------------
+
+ax[0,0].plot(
+    r.index,
+    r.values,
+    color=COL["Actual"],
+    lw=1.5,
+    label="pc_new_registrations"
+)
+
+for i, yr in enumerate(VDA):
+    ax[0,0].scatter(
+        pd.Timestamp(yr, 6, 1),
+        VDA[yr]["forecast"] / 12,
+        color=COL["VDA"],
+        marker="D",
+        s=150,
+        edgecolors="white",
+        linewidth=1.2,
+        zorder=10,
+        label="VDA annual forecast (÷12)" if i == 0 else None
+    )
+
+ax[0,0].set_title(
+    "101 · German passenger car registrations 2016–2026 with VDA forecast points"
+)
+ax[0,0].set_ylabel("registrations/month")
+ax[0,0].legend(loc="upper right", fontsize=8)
+ax[0,0].yaxis.set_major_formatter(KFMT)
+
+# ------------------------------------------------------------------
+# Top-right: Trend
+# ------------------------------------------------------------------
+
+ax[0,1].plot(
+    dec.trend.dropna(),
+    color=COL["MA(12)"],
+    lw=1.8
+)
+
+ax[0,1].set_title("Trend component")
+ax[0,1].yaxis.set_major_formatter(KFMT)
+
+# ------------------------------------------------------------------
+# Bottom-left: Seasonal Component
+# ------------------------------------------------------------------
+
+mavg = [
+    dec.seasonal[dec.seasonal.index.month == m].mean()
+    for m in range(1,13)
+]
+
+ax[1,0].bar(
+    ["J","F","M","A","M","J","J","A","S","O","N","D"],
+    mavg,
+    color=["#D4537E" if v>0 else "#378ADD" for v in mavg],
+    alpha=.8
+)
+
+ax[1,0].set_title("Seasonal component (avg by month)")
+ax[1,0].yaxis.set_major_formatter(KFMT)
+
+# ------------------------------------------------------------------
+# Bottom-right: ACF
+# ------------------------------------------------------------------
+
+diffid = r.diff().diff(12).dropna()
+ci = 2 / np.sqrt(len(diffid))
+av = acf(diffid, nlags=24, fft=True)
+
+ax[1,1].bar(
+    range(1,25),
+    av[1:25],
+    color=["#7F77DD" if abs(v)>ci else "#D3D1C7" for v in av[1:25]]
+)
+
+ax[1,1].axhline(ci, color=COL["VDA"], ls="--", lw=.8)
+ax[1,1].axhline(-ci, color=COL["VDA"], ls="--", lw=.8)
+
+ax[1,1].set_title("ACF after d=1, D=12 (significant = coloured)")
+ax[1,1].set_xlabel("Lag")
+
+plt.tight_layout()
+
+plt.savefig(
+    "results/plots/step1_exploratory.png",
+    dpi=300,
+    bbox_inches="tight"
+)
+
+plt.show()
+plt.close()
+
 wait()
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -420,51 +509,385 @@ print(f"  Combination  OOS Theil U : {OOS_U['Combination']:.4f}  ← best of all
 # ═══════════════════════════════════════════════════════════════════════════
 #  STEP 6 — FORWARD FORECAST vs VDA
 # ═══════════════════════════════════════════════════════════════════════════
+
 step(6, "FORWARD FORECAST — all models vs VDA benchmark (May 2026 – Dec 2027)")
-ytd=int(r[r.index.year==2026].sum())
-proj={nm:ytd+int(sum(v for v,d in zip(forecasts[nm],future) if d.year==2026)) for nm in forecasts}
-combo_2026=proj["Combination"]
-print(f"  Combination 2026 projection: {combo_2026:,}   VDA: 2,900,000   "
-      f"diff {combo_2026-2_900_000:+,} ({(combo_2026-2_900_000)/2_900_000*100:+.1f}%)")
+
+ytd = int(r[r.index.year == 2026].sum())
+
+proj = {
+    nm: ytd + int(sum(v for v, d in zip(forecasts[nm], future) if d.year == 2026))
+    for nm in forecasts
+}
+
+combo_2026 = proj["Combination"]
+
+print(
+    f"  Combination 2026 projection: {combo_2026:,}   VDA: 2,900,000   "
+    f"diff {combo_2026-2_900_000:+,} "
+    f"({(combo_2026-2_900_000)/2_900_000*100:+.1f}%)"
+)
 
 fig, ax = plt.subplots(figsize=(14,6))
-ax.plot(r["2022":].index, r["2022":].values, color=COL["Actual"], lw=2, marker="o", ms=2.5, label="Actual", zorder=10)
-for nm in ["Mean","MA(12)","WMA(12)","SES","Holt Damped","Lin. Reg.","ARIMA","SARIMA","Holt-Winters","Combination"]:
-    lw=2.6 if nm=="Combination" else 1.0
-    al=1.0 if nm in("Combination","SARIMA","Holt-Winters") else .5
-    ax.plot(future, forecasts[nm], color=COL[nm], lw=lw, alpha=al,
-            zorder=9 if nm=="Combination" else 3, label=f"{nm} (U={OOS_U[nm]:.3f})")
+
+# ------------------------------------------------------------------
+# Actual series
+# ------------------------------------------------------------------
+
+ax.plot(
+    r["2022":].index,
+    r["2022":].values,
+    color=COL["Actual"],
+    lw=2,
+    marker="o",
+    ms=2.5,
+    label="Actual",
+    zorder=10
+)
+
+# ------------------------------------------------------------------
+# Forecast models
+# ------------------------------------------------------------------
+
+for nm in [
+    "Mean",
+    "MA(12)",
+    "WMA(12)",
+    "SES",
+    "Holt Damped",
+    "Lin. Reg.",
+    "ARIMA",
+    "SARIMA",
+    "Holt-Winters",
+    "Combination",
+]:
+
+    lw = 2.6 if nm == "Combination" else 1.0
+    al = 1.0 if nm in ("Combination", "SARIMA", "Holt-Winters") else 0.5
+
+    ax.plot(
+        future,
+        forecasts[nm],
+        color=COL[nm],
+        lw=lw,
+        alpha=al,
+        zorder=9 if nm == "Combination" else 3,
+        label=f"{nm} (U={OOS_U[nm]:.3f})"
+    )
+
+# ------------------------------------------------------------------
+# VDA annual targets
+# ------------------------------------------------------------------
+
 for yr in VDA:
-    if pd.Timestamp(yr,6,1)>=pd.Timestamp("2022-01-01"):
-        ax.scatter([pd.Timestamp(yr,6,1)],[VDA[yr]["forecast"]/12],color=COL["VDA"],s=95,marker="D",zorder=11,
-                   label=f"VDA {yr}: {VDA[yr]['forecast']/1e6:.2f}M" if yr==2024 else None)
-ax.axvline(r.index[-1], color="#bbb", lw=1.2, ls="--")
-ax.set_title("Step 6 — Forward forecast: all models vs VDA benchmark", fontsize=12, fontweight="bold")
-ax.set_ylabel("Registrations / month"); ax.yaxis.set_major_formatter(KFMT)
-ax.legend(fontsize=7.5, ncol=3, loc="upper right")
-plt.tight_layout(); plt.savefig("results/plots/step6_forecast_all.png", bbox_inches="tight"); plt.show(); plt.close()
+
+    if pd.Timestamp(yr,6,1) >= pd.Timestamp("2022-01-01"):
+
+        ax.scatter(
+            pd.Timestamp(yr,6,1),
+            VDA[yr]["forecast"]/12,
+            color=COL["VDA"],
+            marker="D",
+            s=150,
+            edgecolors="white",
+            linewidth=1.2,
+            zorder=11,
+            label=f"VDA {yr}: {VDA[yr]['forecast']/1e6:.2f}M" if yr == 2024 else None
+        )
+
+# ------------------------------------------------------------------
+# Split line + section labels
+# ------------------------------------------------------------------
+
+split_date = pd.Timestamp("2026-04-01")
+
+ax.axvline(
+    split_date,
+    color="black",
+    linestyle="--",
+    linewidth=1.5,
+    zorder=20
+)
+
+ymax = ax.get_ylim()[1]
+
+ax.text(
+    pd.Timestamp("2023-04-01"),
+    ymax * 0.94,
+    "Backtest (OOS)",
+    fontsize=11,
+    fontweight="bold"
+)
+
+ax.text(
+    pd.Timestamp("2026-08-15"),
+    ymax * 0.94,
+    "Forward Forecast",
+    fontsize=11,
+    fontweight="bold"
+)
+
+# ------------------------------------------------------------------
+
+ax.set_title(
+    "Step 6 — Forward forecast: all models vs VDA benchmark",
+    fontsize=12,
+    fontweight="bold"
+)
+
+ax.set_ylabel("Registrations / month")
+ax.yaxis.set_major_formatter(KFMT)
+
+# ------------------------------------------------------------------
+# Legend below the graph — single source of truth, no other
+# .legend() calls should exist anywhere else in this block
+# ------------------------------------------------------------------
+
+handles, labels = ax.get_legend_handles_labels()
+
+legend = ax.legend(
+    handles, labels,
+    fontsize=8,
+    ncol=3,
+    loc="upper center",
+    bbox_to_anchor=(0.5, -0.18),
+    frameon=True,
+    borderaxespad=0.5
+)
+
+fig.subplots_adjust(bottom=0.28)
+
+plt.savefig(
+    "results/plots/step6_forecast_all.png",
+    dpi=300,
+    bbox_inches="tight",
+    bbox_extra_artists=(legend,)
+)
+
+plt.show()
+plt.close()
+
 wait()
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  STEP 7 — BEST MODELS vs VDA (clean)
+#  STEP 7 — BEST MODELS vs VDA (Presentation version)
 # ═══════════════════════════════════════════════════════════════════════════
-step(7, "FINAL COMPARISON — best models vs VDA benchmark")
-fig, ax = plt.subplots(figsize=(13,5.5))
-ax.plot(r["2021":].index, r["2021":].values, color=COL["Actual"], lw=2, marker="o", ms=2.5, label="Actual", zorder=10)
-for nm,ls in [("SARIMA","--"),("Holt-Winters",":"),("ARIMA","-."),("Combination","-")]:
-    lw=2.5 if nm=="Combination" else 1.6
-    ax.plot(future, forecasts[nm], color=COL[nm], lw=lw, ls=ls, marker="o", ms=3,
-            label=f"{nm} (OOS U={OOS_U[nm]:.4f})", zorder=8 if nm=="Combination" else 4)
+
+step(7, "FINAL COMPARISON — Best Models vs VDA Benchmark")
+
+fig, ax = plt.subplots(figsize=(16,7))
+
+# ------------------------------------------------------------------
+# Shade the forecast zone so the split is obvious without reading text
+# ------------------------------------------------------------------
+
+split_date = pd.Timestamp("2026-04-01")
+
+ax.axvspan(
+    split_date,
+    future[-1],
+    color="#f0f0f0",
+    alpha=0.6,
+    zorder=0
+)
+
+# ------------------------------------------------------------------
+# Actual data — kept as plain reference, not fighting for attention
+# ------------------------------------------------------------------
+
+ax.plot(
+    r["2021":].index,
+    r["2021":].values,
+    color="#222222",
+    lw=2,
+    marker="o",
+    ms=2.5,
+    label="Actual",
+    zorder=6
+)
+
+# ------------------------------------------------------------------
+# Context models — demoted to gray "background noise"
+# They stay on the chart (so a sharp professor can ask "what about
+# ARIMA?") but they no longer compete visually with Combination.
+# ------------------------------------------------------------------
+
+context_models = [
+    ("SARIMA", "--"),
+    ("ARIMA", "-."),
+    ("Holt-Winters", ":"),
+]
+
+first_context = True
+for nm, ls in context_models:
+    ax.plot(
+        future,
+        forecasts[nm],
+        color="#B5B5B5",
+        lw=1.2,
+        ls=ls,
+        alpha=0.6,
+        zorder=3,
+        label="Other models (reference)" if first_context else None
+    )
+    first_context = False
+
+# ------------------------------------------------------------------
+# Combination — the winning model. Made visually dominant:
+# thicker, saturated color, markers, highest zorder.
+# ------------------------------------------------------------------
+
+HIGHLIGHT = "#C0392B"   # deep red — pick any color not already used elsewhere
+
+ax.plot(
+    future,
+    forecasts["Combination"],
+    color=HIGHLIGHT,
+    lw=4,
+    marker="o",
+    ms=5,
+    markerfacecolor="white",
+    markeredgecolor=HIGHLIGHT,
+    markeredgewidth=1.5,
+    label=f"Combination — best model (U={OOS_U['Combination']:.3f})",
+    zorder=10
+)
+
+# ------------------------------------------------------------------
+# VDA — historical accuracy markers (small, faded) + a clear
+# horizontal target line for 2026, drawn right across the forecast
+# zone so it's a direct visual ruler against the Combination line.
+# ------------------------------------------------------------------
+
+first_hist_vda = True
 for yr in VDA:
-    ax.scatter([pd.Timestamp(yr,6,1)],[VDA[yr]["forecast"]/12],color=COL["VDA"],s=100,marker="D",zorder=11,
-        label=f"VDA {yr}: {VDA[yr]['forecast']/1e6:.2f}M" + (f" (act {VDA[yr]['actual']/1e6:.2f}M)" if VDA[yr]['actual'] else ""))
-ax.axvline(r.index[-1], color="#bbb", lw=1, ls="--")
-ax.annotate(f"Combination 2026: {combo_2026:,}\nVDA 2026: 2,900,000\nDiff: {combo_2026-2_900_000:+,}",
-    xy=(pd.Timestamp("2026-08-01"), r.min()*0.97), fontsize=8.5,
-    bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor="#bbb", alpha=.95))
-ax.set_title("Step 7 — Best models + combination vs VDA benchmark", fontsize=12, fontweight="bold")
-ax.set_ylabel("Registrations / month"); ax.yaxis.set_major_formatter(KFMT); ax.legend(fontsize=8.5, loc="upper left")
-plt.tight_layout(); plt.savefig("results/plots/step7_best_vs_vda.png", bbox_inches="tight"); plt.show(); plt.close()
+    if yr in (2024, 2025):
+        ax.scatter(
+            pd.Timestamp(yr,6,1),
+            VDA[yr]["forecast"]/12,
+            color=COL["VDA"],
+            marker="D",
+            s=90,
+            alpha=0.55,
+            edgecolors="white",
+            linewidth=1,
+            zorder=8,
+            label="VDA — past years (actual vs forecast)" if first_hist_vda else None
+        )
+        first_hist_vda = False
+
+vda_2026_monthly = VDA[2026]["forecast"] / 12
+
+ax.hlines(
+    y=vda_2026_monthly,
+    xmin=split_date,
+    xmax=future[-1],
+    color=COL["VDA"],
+    linestyle="--",
+    linewidth=2.2,
+    zorder=9,
+    label=f"VDA 2026 target ({vda_2026_monthly/1000:.0f}k/mo, {VDA[2026]['forecast']/1e6:.2f}M/yr)"
+)
+
+# ------------------------------------------------------------------
+# The key message — say the takeaway instead of making people
+# calculate it. This is the headline of the slide.
+# ------------------------------------------------------------------
+
+pct_diff = (combo_2026 - 2_900_000) / 2_900_000 * 100
+direction = "above" if pct_diff > 0 else "below"
+
+key_msg = (
+    f"Combination forecast: {combo_2026:,}\n"
+    f"VDA 2026 target: 2,900,000\n"
+    f"→ {abs(pct_diff):.1f}% {direction} VDA"
+)
+
+ax.text(
+    pd.Timestamp("2026-09-15"),
+    ax.get_ylim()[1] * 0.97,
+    key_msg,
+    fontsize=13,
+    fontweight="bold",
+    color=HIGHLIGHT,
+    va="top",
+    ha="center",
+    bbox=dict(
+        boxstyle="round,pad=0.6",
+        facecolor="white",
+        edgecolor=HIGHLIGHT,
+        linewidth=1.8,
+        alpha=0.95
+    ),
+    zorder=20
+)
+
+# ------------------------------------------------------------------
+# Split line + section labels
+# ------------------------------------------------------------------
+
+ax.axvline(split_date, color="black", linestyle="--", linewidth=1.5, zorder=5)
+
+ymax = ax.get_ylim()[1]
+
+ax.text(
+    pd.Timestamp("2022-09-01"),
+    ymax * 0.94,
+    "Historical Data",
+    fontsize=13,
+    fontweight="bold"
+)
+
+ax.text(
+    pd.Timestamp("2026-05-15"),
+    ymax * 0.80,
+    "Forecast",
+    fontsize=13,
+    fontweight="bold"
+)
+
+# ------------------------------------------------------------------
+# Labels / styling — bigger, cleaner, projector-friendly
+# ------------------------------------------------------------------
+
+ax.set_title(
+    "Combination Model vs VDA Benchmark — 2026 Forecast",
+    fontsize=16,
+    fontweight="bold",
+    pad=15
+)
+
+ax.set_ylabel("Registrations / month", fontsize=12)
+ax.yaxis.set_major_formatter(KFMT)
+ax.tick_params(axis="both", labelsize=11)
+
+ax.grid(axis="y", linestyle="-", alpha=0.15)
+ax.grid(axis="x", visible=False)
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+# ------------------------------------------------------------------
+# Legend — trimmed to the entries that matter, single row, large font
+# ------------------------------------------------------------------
+
+ax.legend(
+    fontsize=10,
+    ncol=3,
+    loc="lower center",
+    bbox_to_anchor=(0.5, -0.22),
+    frameon=True
+)
+
+plt.tight_layout()
+
+plt.savefig(
+    "results/plots/step7_best_vs_vda.png",
+    dpi=300,
+    bbox_inches="tight"
+)
+
+plt.show()
+plt.close()
+
 wait()
 
 # ═══════════════════════════════════════════════════════════════════════════
