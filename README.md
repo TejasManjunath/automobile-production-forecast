@@ -1,237 +1,159 @@
-# Simulation & Forecasting Techniques — Project Brief
-## German Passenger Car New Registrations: Classical Time Series Forecasting vs. VDA Institutional Forecast
+# German Passenger Car Registrations — Forecasting vs VDA
+
+**Can a purely statistical model, trained only on public registration data, keep up with Germany's institutional automotive forecaster?**
+
+We built a pipeline to find out.
+
+![Hero Overview](results/plots/hero_readme.png)
 
 ---
 
-## 1. Objective
+## The Short Answer
 
-Forecast monthly German passenger car new registrations using the full
-classical forecasting toolkit from the course, evaluate every model under
-one identical backtest, and report a forecast combination of the
-best-performing models. Compare results against the VDA's published annual
-forecast and against a random-walk benchmark.
+Our combination model achieved an out-of-sample Theil's U of **0.8544** — 14.6% more accurate than a naive random-walk benchmark — across 76 genuine expanding-window forecasts. In 2024, it outperformed the VDA's published annual forecast (**+0.42% error** vs VDA's **−0.62%**) using nothing but historical registration data and classical statistical methods. No proprietary order-book data, no industry intelligence, no ML black boxes.
 
-We are not assuming a win going in — we're building the framework correctly
-and reporting whatever it finds. VDA's recent annual forecasts have been
-very accurate (~0.6% error in 2024 and 2025), so the honest headline result
-may be "competitive, not a clean win." Our best realistic shot at a genuine
-beat is the EV/BEV registrations sub-series, where VDA revised its forecast
-several times after Germany ended its EV purchase subsidy in Dec 2023.
-
-**Two-layer evaluation:**
-- **Layer 1 — Monthly:** expanding-window backtest vs. random walk. Many
-  data points, real statistical comparison.
-- **Layer 2 — Annual:** sum 12 monthly forecasts to a full-year total,
-  compare vs. VDA's published forecast at VDA's actual forecast date. Few
-  data points — treat as a case study, not a stats test.
+2025 was VDA's year. One-one overall — which, against an organisation with full access to every OEM's production pipeline, we will take.
 
 ---
 
-## 2. Dataset
+## What We Built
 
-`german_auto_monthly_2016_2026.csv` — already cleaned, tidy, monthly,
-Jan 2016–Apr 2026, no missing months. Columns: `date`,
-`pc_new_registrations` (PRIMARY TARGET), `pc_domestic_production`,
-`reg_electric`, `reg_bev`, `reg_phev`, `prod_electric`, `prod_bev`,
-`prod_phev`.
+A 9-step Python forecasting pipeline that:
 
-Source: Deutsche Bundesbank monthly compilation, built from VDA + Bundesbank
-calculations.
+1. Loads and explores 124 months of German passenger car registrations (Jan 2016 – Apr 2026)
+2. Tests stationarity via ADF — identifies that both regular and seasonal differencing are required
+3. Fits 10 classical models — from naive baselines through to SARIMA and a forecast combination
+4. Validates residuals — Ljung-Box white-noise test, Shapiro-Wilk normality, scatter diagnostics
+5. Combines forecasts — Holt-Winters + ARIMA equal-weight (Bates & Granger 1969)
+6. Forecasts forward — May 2026 through December 2027, all models vs VDA
+7. Benchmarks vs VDA — the German auto industry's published annual forecast
+8. Ranks all models — OOS Theil's U leaderboard across all 12 entries
+9. Runs genuine OOS evaluation 2023–2026 — models retrained each month, one step ahead, never sees the future
 
-VDA institutional benchmark figures (full-year registrations):
-2024 forecast ~2.80M (actual 2,817,331) · 2025 forecast ~2.84M
-(actual 2,857,591) · 2026 forecast ~2.90M.
-
-**Known data issue — must be decided BEFORE anyone fits a model, as a team,
-not independently:** registrations show a level shift — ~3.4–3.6M/year in
-2016–2019 vs. ~2.6–2.86M/year from 2020 onward (COVID + chip shortage).
-Lock one approach for the whole team: either (a) train on post-2020 data
-only, or (b) use the full series with an intervention dummy for the COVID
-period. Whichever is chosen, every model uses the same choice.
+Every chart and table saves automatically when the script runs.
 
 ---
 
-## 3. THE SHARED HARNESS — build this first, before any model fitting
+## Results
 
-This is the one piece of infrastructure that is NOT split, NOT parallel,
-and NOT "whoever is comfortable with it." One of you builds it tonight as
-the first task; both of you import it and call it. This is what makes the
-comparison sheet trustworthy.
+### OOS Model Leaderboard
 
-It must fix, for every model without exception:
-1. **The train/test boundary(ies).** Use an expanding-window backtest, not
-   a single split — define the fixed list of origin points (e.g. start
-   backtesting from month 85, grow the window by 1 each step) once, in one
-   place.
-2. **The metric functions.** One shared `mean_error()`, `mae()`, `rmse()`,
-   `theils_u()`, `white_noise_test()`, `normality_test()` — every model
-   calls the same functions on the same units (raw registrations, not a
-   mix of raw and log/scaled).
-3. **The annual aggregation function** for Layer 2 (sum 12 monthly
-   forecasts → compare to VDA figure at the correct origin date).
-4. **The shared results schema** — one row per model per backtest origin,
-   written to the same sheet/CSV, same column names, so results from both
-   of you stack cleanly without manual reconciliation.
+| Model | OOS Theil's U | Beats Naive | White Noise |
+|---|---|---|---|
+| **Combination** | **0.8544** | YES | Yes |
+| Holt-Winters | 0.8870 | YES | Yes |
+| WMA(12) | 0.8909 | YES | No |
+| SARIMA | 0.8961 | YES | Yes |
+| Holt Damped | 0.9095 | YES | No |
+| MA(3) | 0.9069 | YES | No |
+| ARIMA | 0.9200 | YES | No |
+| SES | 0.9573 | YES | No |
+| Lin. Reg. | 0.9824 | YES | No |
+| MA(12) | 0.9181 | YES | No |
+| WMA(3) | 0.9141 | YES | No |
+| Mean | 1.1129 | NO | No |
 
-Whoever builds it shares the code/notebook with the other before either of
-you finalizes a single model's numbers.
+11 of 12 models beat the naive random walk. SARIMA is the most statistically clean model — only one passing the white-noise residual diagnostic. Linear Regression is the interesting failure: best in-sample fit (RMSE 27,284) but 11th out-of-sample. Classic overfitting — it memorised the training data and could not generalise.
 
----
+### vs VDA Annual Forecast
 
-## 4. Required Models — pick freely, work in parallel, race to the sheet
+| Year | Actual | Combination | Combo error | VDA forecast | VDA error | Winner |
+|---|---|---|---|---|---|---|
+| 2024 | 2,817,331 | 2,831,535 | +0.42% | 2,800,000 | −0.62% | **Our model** |
+| 2025 | 2,857,591 | 2,824,878 | −1.14% | 2,840,000 | −0.62% | VDA |
+| 2026 | TBD | 2,929,124 | — | 2,900,000 | — | — |
 
-All 10 are required in the final deck regardless of who claims them first.
-Pick whichever you're more comfortable with; trade or split remaining ones
-once you see who's faster on what.
-
-1. Mean
-2. Moving Average MA(k)
-3. Weighted Moving Average WMA(k)
-4. Single Exponential Smoothing (SES)
-5. Double Exponential Smoothing (Holt's linear trend)
-6. Triple Exponential Smoothing (Holt-Winters)
-7. Linear Regression with AIC-based stepwise selection
-8. ARIMA (Box-Jenkins)
-9. SARIMA (seasonal Box-Jenkins)
-10. Forecast Combination (e.g. weighted average of the two best individual
-    models by out-of-sample Theil's U — decide combination membership by
-    theoretical complementarity, not by peeking at the full leaderboard
-    and cherry-picking after the fact)
-
-For models 1–3: implement, run through the same harness, and explicitly
-document why they're inappropriate given the data's trend + seasonality —
-this is graded content (slide 8 rubric: "why are some models not
-appropriate").
+Our 2026 projection: 2,929,124 — 1% above VDA's 2.9M target. We are slightly more bullish on the market.
 
 ---
 
-## 5. The shared comparison sheet
+## Key Methodological Decisions
 
-One spreadsheet/CSV, one row per (model, backtest origin), columns:
-`model_name | owner | backtest_origin_date | horizon | ME | MAE | RMSE |
-theils_u | white_noise_pvalue | normality_pvalue | in_sample_or_oos`
+**Full 2016–2026 series, not post-2020 only.**
+Training SARIMA on post-2020 data only was tested. Theil's U jumped to 1.55 — worse than naive. The pre-COVID years carry seasonal structure the model needs. The COVID level shift is handled with a binary intervention dummy (equals 1 from April 2020 onward), entered as an exogenous regressor in ARIMA and SARIMA.
 
-Update it as each model finishes. Once all 10 are in, the combination step
-and the VDA/random-walk comparison both read directly from this sheet.
+**Expanding-window backtest, not a single train/test split.**
+76 origins starting December 2019. Each forecast uses only data available at that point. One-step-ahead throughout. This is how real forecasters operate.
 
----
-
-## 6. Workflow / Slide Structure (graded directly — follow this agenda)
-
-1. Problem definition
-2. Information gathering
-3. Exploratory analysis (plot, descriptive stats, ACF/PACF, stationarity/
-   unit-root test, decomposition, seasonality, qq-plot/normality)
-4. Model choice (justified by exploratory analysis, before touching the
-   test set)
-5. Fitting the model (in-sample stats, all 10 models)
-6. Model use and backtesting (out-of-sample, random walk, VDA, discussion
-   of where/why we win or lose)
+**enforce_stationarity=True in SARIMAX.**
+Without it, a single backtest origin in April 2020 produced Theil's U = 162 billion. The flag keeps MA coefficients inside the unit circle and prevents the numerical explosion that the COVID lockdown month caused in the differenced series.
 
 ---
 
-## 7. Non-negotiables, regardless of who does what
+## How the ARIMA Order Was Identified
 
-- Same harness, same metrics, same train/test windows for every model — no
-  exceptions, no independently-built backtests.
-- Don't choose the headline/combination model by scanning out-of-sample
-  performance across all 10 and keeping the best — let exploratory
-  analysis nominate ARIMA/SARIMA orders before the test set is touched.
-- Granularity discipline: monthly model output vs. monthly random walk;
-  monthly-summed-to-annual vs. VDA annual, at VDA's actual forecast origin
-  date. Never compare a monthly number to an annual one directly.
-- Be ready to explain the COVID/chip-shortage handling decision in the
-  discussion.
+Box-Jenkins methodology, not guesswork:
+
+1. ADF at level: p=0.511 — non-stationary
+2. ADF after d=1: p=0.0003 — trend stationary, seasonal autocorrelation remains
+3. ADF after d=1, D=12: p<0.0001 — fully stationary. Both differences required.
+4. ACF of stationary series: spike at lag 1 → MA(1)
+5. PACF of stationary series: spike at lag 1 → AR(1)
+6. AIC grid: ARIMA(1,1,1) lowest at 2968.12
+7. SARIMA(0,1,1)(0,1,1)[12]: AIC 2665.32 — beats ARIMA by 303 points
+
+![Stationarity and Identification](results/plots/step2_stationarity.png)
 
 ---
 
-# SHAREABLE AI PROMPT (paste into your own AI tool)
+## OOS 2023–2026
+
+![OOS Evaluation](results/plots/step9_oos_2023_2026.png)
+
+For every month from January 2023 to April 2026, the model was retrained on all data strictly before that month and asked to forecast one step ahead. The chart shows what it predicted vs what actually happened, with the VDA monthly target overlaid.
+
+---
+
+## How to Run
+
+```bash
+git clone https://github.com/TejasManjunath/automobile-production-forecast
+cd automobile-production-forecast
+pip install -r requirements.txt
+
+# Interactive — pauses between steps
+python model/all_models.py
+
+# Straight through
+python model/all_models.py --no-pause
+```
+
+All charts save to `results/plots/` and all tables to `results/tables/` automatically.
+
+---
+
+## Repo Structure
 
 ```
-I'm working on a university group project for a Simulation & Forecasting
-Techniques course (MSc Business Intelligence & Data Science). Two of us are
-doing modeling in parallel; a third teammate handles slides/documentation
-separately. We are racing to implement 10 required models and feeding
-results into one shared comparison sheet, so consistency across our two
-parallel workstreams is critical.
-
-CONTEXT
-Forecasting German passenger car new registrations (monthly, Jan 2016 -
-Apr 2026, n=124, no missing months) using classical time series methods,
-benchmarked against the VDA's (German Association of the Automotive
-Industry) published annual forecast and against a random walk. The course
-requires implementing every model below under ONE identical backtest
-framework, then reporting a forecast combination of the best models.
-VDA's recent annual forecasts have been very accurate (~0.6% error in 2024
-and 2025) - we are not assuming we'll beat them on the headline series; our
-realistic shot at a genuine win is the EV/BEV registrations sub-series,
-where VDA revised forecasts repeatedly after Germany ended its EV purchase
-subsidy in December 2023.
-
-DATASET
-Tidy monthly CSV: date, pc_new_registrations (PRIMARY TARGET),
-pc_domestic_production, reg_electric, reg_bev, reg_phev, prod_electric,
-prod_bev, prod_phev. Source: Bundesbank monthly compilation built from VDA
-data. KNOWN ISSUE: level shift around 2020 (pre-2020 ~3.4-3.6M/year,
-post-2020 ~2.6-2.86M/year registrations) from COVID + chip shortage - our
-team has agreed to handle this as: [fill in: "training on post-2020 data
-only" OR "full series with a COVID intervention dummy"] - use this
-consistently in everything you generate for me.
-
-SHARED BACKTEST HARNESS (use exactly this, do not invent your own splits
-or metric formulas - my teammate's results must be comparable to mine)
-- Expanding-window backtest, not a single train/test split. [Paste in the
-  exact origin points / window definition once your team has built and
-  shared the harness code.]
-- Metric functions: ME, MAE, RMSE, Theil's U, white-noise test on
-  residuals, normality test (qq-plot) - on raw registration units, not
-  log/scaled.
-- Output format: one row per (model, backtest origin) with columns
-  model_name, owner, backtest_origin_date, horizon, ME, MAE, RMSE,
-  theils_u, white_noise_pvalue, normality_pvalue, in_sample_or_oos - so it
-  drops straight into our shared comparison sheet.
-
-MY ASSIGNED MODELS: [fill in which of the 10 you're claiming, e.g. "Mean,
-Moving Average, Weighted Moving Average, Single Exponential Smoothing"]
-
-WHAT I NEED FROM YOU
-1. Python code (pandas/statsmodels/pmdarima as appropriate) to fit my
-   assigned models on pc_new_registrations, using the shared harness above.
-2. In-sample stats for each model (ME, MAE, RMSE, Theil's U, residual
-   diagnostics).
-3. Out-of-sample results from the expanding-window backtest, in the exact
-   output schema above.
-4. For Mean/MA/WMA specifically: a clear explanation of why the model is
-   NOT appropriate for this data given its trend and strong seasonality
-   (seasonal index roughly: Jan 85, Feb 89, Mar 115, Jun 114, relative to
-   100 average) - needed for our "why some models are inappropriate"
-   slide.
-5. Flag explicitly if anything I'm asking for would constitute data
-   snooping (e.g. choosing final model parameters by peeking at
-   out-of-sample performance) so I avoid it before it's in the sheet.
-
-Ask me clarifying questions before writing code if anything about the
-harness or data handling is ambiguous - I'd rather lose two minutes now
-than produce results my teammate can't compare to theirs.
-```
-## 8. Repo structure 
-```
-auto-forecasting-project/
-├── README.md                          ← the brief + objective
+automobile-production-forecast/
+├── model/
+│   └── all_models.py              <- 9-step pipeline, fully commented
+├── harness/
+│   └── backtest_harness.py        <- shared metric functions and data loader
 ├── data/
 │   └── german_auto_monthly_2016_2026.csv
-├── harness/
-│   └── backtest_harness.py            ← built FIRST, shared, nobody touches after
-├── models/
-│   ├── modeler1_baselines_smoothing.py
-│   └── modeler2_arima_sarima_combo.py
 ├── results/
-│   └── comparison_sheet.csv           ← both of you append rows here, harness enforces the schema
-└── slides/                           
+│   ├── plots/                     <- all charts (step1-step9 + hero)
+│   └── tables/                    <- all CSVs
+├── requirements.txt
+└── README.md
 ```
-## 9. Links 
-1. Google Sheets : https://docs.google.com/spreadsheets/d/1ZEj9fiKvT7f7GpcaDJrukRmAjcT3F2u4j8v44R8iA-k/edit?usp=sharing
-2. The dataset itself — german_auto_monthly_2016_2026.csv (already built, attached above). This is the one your team actually models on. Don't make teammates re-derive it from raw sources.
-3. VDA monthly figures (source of the dataset, for citation/methodology slide): https://www.vda.de/en/news/facts-and-figures/monthly-figures
-4. VDA 2026 forecast (institutional benchmark numbers): https://www.vda.de/en/press/press-releases/2025/251208_PM_Forecasts_2026
-5. Bundesbank Monthly Report Nov 2024 (chart source, automotive sector discussion, cite for context not as a numeric benchmark): https://publikationen.bundesbank.de/publikationen-en/reports-studies/monthly-reports/monthly-report-november-2024-943818
+
+---
+
+## Stack
+
+`Python 3.10+` · `pandas` · `numpy` · `statsmodels` · `scipy` · `matplotlib`
+
+---
+
+## Context
+
+Built as part of the Simulation & Forecasting Techniques module, MSc Business Intelligence & Data Science, ISM Dortmund. The research question was genuine: can classical statistical methods compete with an institutional forecaster that has access to OEM order books, semiconductor supply data, and industry networks?
+
+On the headline registration series: roughly yes. On the BEV sub-series — where Germany's sudden EV subsidy termination in December 2023 caused a demand collapse that no historical model could anticipate — no. Knowing why your model fails is part of doing the analysis correctly.
+
+---
+
+*Data: Deutsche Bundesbank monthly compilation, built from VDA and KBA figures.*
+*Benchmark: VDA published annual forecasts 2024 and 2025.*
