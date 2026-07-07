@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environments
+.env
+.venv
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Working files — do not commit
+auto_forecasting_model_tracker.xlsx
+*.xlsx
+!results/Forecasting_Results.xlsx
+
+# Old drafts in root — these should be deleted from the repo
+TMSeries.py
+TimeSeriesAnalysis.py
+plot.py
+
+# Large outputs — generate locally by running the script
+# (uncomment if you don't want to commit the PNGs/CSVs)
+# results/plots/
+# results/tables/
